@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ice Cubes</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="game-header">
+        <div>
+          <h1>Ice Cubes</h1>
+          <p id="status">Arrow keys to move</p>
+        </div>
+        <div class="controls">
+          <button id="prev-stage" type="button" aria-label="Previous stage">Prev</button>
+          <button id="next-stage" type="button" aria-label="Next stage">Next</button>
+          <button id="give-up" type="button">Give Up</button>
+        </div>
+      </header>
+
+      <canvas id="game" width="640" height="640" aria-label="Ice Cubes game board"></canvas>
+    </main>
+
+    <script src="stages.js"></script>
+    <script src="game.js"></script>
+  </body>
+</html>
