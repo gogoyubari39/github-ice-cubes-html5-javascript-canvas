@@ -3,6 +3,7 @@ const TILE_SIZE = 32;
 const canvas = document.getElementById("game");
 const context = canvas.getContext("2d");
 const statusText = document.getElementById("status");
+const attemptsText = document.getElementById("attempts");
 const giveUpButton = document.getElementById("give-up");
 const prevStageButton = document.getElementById("prev-stage");
 const nextStageButton = document.getElementById("next-stage");
@@ -32,10 +33,15 @@ const colors = {
 let blocks = [];
 let fixedCubes = new Set();
 let dots = new Set();
+
 let cleared = false;
+let gameOver = false;
+
 let currentStageIndex = 0;
 let stage = parseStage(STAGES[currentStageIndex].map);
 let player = findPlayer(stage);
+let attempts = 12;
+
 mergeTouchingBlocks();
 collectDotsUnderBlocks();
 
@@ -236,7 +242,7 @@ function mergeTouchingBlocks() {
 }
 
 function movePlayer(dx, dy) {
-  if (cleared) {
+if (cleared || gameOver) {
     return;
   }
 
@@ -360,6 +366,10 @@ function draw() {
   if (cleared) {
     drawClearMessage();
   }
+
+  if (gameOver) {
+    drawGameOverMessage();
+  }
 }
 
 function drawClearMessage() {
@@ -377,16 +387,46 @@ function drawClearMessage() {
   );
 }
 
+function drawGameOverMessage() {
+  context.fillStyle = "rgba(23, 32, 38, 0.72)";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = "#f3f8fb";
+  context.font = "bold 64px Arial, Helvetica, sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+
+  context.fillText(
+    "GAME OVER",
+    canvas.width / 2,
+    canvas.height / 2 - 40
+  );
+
+  context.font = "bold 28px Arial, Helvetica, sans-serif";
+
+  context.fillText(
+    "Press Give Up to Restart",
+    canvas.width / 2,
+    canvas.height / 2 + 40
+  );
+}
+
+
 function updateStatus() {
-  const stageLabel = `Stage ${currentStageIndex + 1}/${STAGES.length}: ${STAGES[currentStageIndex].name}`;
+  const stageLabel =
+    `Stage ${currentStageIndex + 1}/${STAGES.length}: ${STAGES[currentStageIndex].name}`;
 
   if (dots.size === 0) {
     cleared = true;
     statusText.textContent = `${stageLabel} - Clear`;
-    return;
+  } else if (gameOver) {
+    statusText.textContent = "GAME OVER";
+  } else {
+    statusText.textContent =
+      `${stageLabel} - Dots left: ${dots.size}`;
   }
 
-  statusText.textContent = `${stageLabel} - Dots left: ${dots.size}`;
+  attemptsText.textContent = `Attempts: ${attempts}`;
 }
 
 window.addEventListener("keydown", (event) => {
@@ -408,6 +448,27 @@ window.addEventListener("keydown", (event) => {
 });
 
 giveUpButton.addEventListener("click", () => {
+
+  if (gameOver) {
+    attempts = 12;
+    gameOver = false;
+    loadStage(currentStageIndex);
+    return;
+  }
+
+
+  attempts -= 1;
+
+
+  if (attempts <= 0) {
+    attempts = 0;
+    gameOver = true;
+    updateStatus();
+    draw();
+    return;
+  }
+
+
   loadStage(currentStageIndex);
 });
 
