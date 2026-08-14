@@ -8,6 +8,7 @@ const giveUpButton = document.getElementById("give-up");
 const prevStageButton = document.getElementById("prev-stage");
 const nextStageButton = document.getElementById("next-stage");
 const gameShell = document.querySelector(".game-shell");
+const directionButtons = document.querySelectorAll("[data-direction]");
 
 const tiles = {
   floor: ".",
@@ -529,6 +530,24 @@ nextStageButton.addEventListener("click", () => {
   }
 
   loadStage(currentStageIndex + 1);
+});
+
+const touchMoves = {
+  up: [0, -1],
+  down: [0, 1],
+  left: [-1, 0],
+  right: [1, 0]
+};
+
+directionButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    if (awaitingExitConfirmation || gameEnded) {
+      return;
+    }
+
+    const move = touchMoves[button.dataset.direction];
+    movePlayer(move[0], move[1]);
+  });
 });
 
 
