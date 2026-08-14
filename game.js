@@ -426,7 +426,7 @@ function updateStatus() {
       `${stageLabel} - Dots left: ${dots.size}`;
   }
 
-  attemptsText.textContent = `Attempts: ${attempts}`;
+  attemptsText.textContent = `残機: ${attempts}`;
 }
 
 window.addEventListener("keydown", (event) => {
