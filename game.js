@@ -7,6 +7,7 @@ const attemptsText = document.getElementById("attempts");
 const giveUpButton = document.getElementById("give-up");
 const prevStageButton = document.getElementById("prev-stage");
 const nextStageButton = document.getElementById("next-stage");
+const gameShell = document.querySelector(".game-shell");
 
 const tiles = {
   floor: ".",
@@ -36,6 +37,9 @@ let dots = new Set();
 
 let cleared = false;
 let gameOver = false;
+let awaitingExitConfirmation = false;
+let gameEnded = false;
+const clearedStages = new Set();
 
 let currentStageIndex = 0;
 let stage = parseStage(STAGES[currentStageIndex].map);
@@ -242,7 +246,7 @@ function mergeTouchingBlocks() {
 }
 
 function movePlayer(dx, dy) {
-if (cleared || gameOver) {
+  if (cleared || gameOver || awaitingExitConfirmation || gameEnded) {
     return;
   }
 
@@ -377,14 +381,21 @@ function drawClearMessage() {
   context.fillRect(0, 0, canvas.width, canvas.height);
 
   context.fillStyle = "#f3f8fb";
+  const allStagesCleared = clearedStages.size === STAGES.length;
+
   context.font = "bold 64px Arial, Helvetica, sans-serif";
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.fillText(
-    currentStageIndex === STAGES.length - 1 ? "ALL CLEAR" : "CLEAR",
+    allStagesCleared ? "ALL CLEAR" : "CLEAR",
     canvas.width / 2,
-    canvas.height / 2
+    canvas.height / 2 - (allStagesCleared ? 36 : 0)
   );
+
+  if (awaitingExitConfirmation) {
+    context.font = "bold 28px Arial, Helvetica, sans-serif";
+    context.fillText("ゲームを終了しますか (y/n)", canvas.width / 2, canvas.height / 2 + 42);
+  }
 }
 
 function drawGameOverMessage() {
@@ -418,7 +429,11 @@ function updateStatus() {
 
   if (dots.size === 0) {
     cleared = true;
-    statusText.textContent = `${stageLabel} - Clear`;
+    clearedStages.add(currentStageIndex);
+    awaitingExitConfirmation = clearedStages.size === STAGES.length;
+    statusText.textContent = awaitingExitConfirmation
+      ? "ALL CLEAR - ゲームを終了しますか (y/n)"
+      : `${stageLabel} - Clear`;
   } else if (gameOver) {
     statusText.textContent = "GAME OVER";
   } else {
@@ -430,6 +445,31 @@ function updateStatus() {
 }
 
 window.addEventListener("keydown", (event) => {
+  if (gameEnded) {
+    return;
+  }
+
+  if (awaitingExitConfirmation) {
+    const answer = event.key.toLowerCase();
+
+    if (answer === "y") {
+      event.preventDefault();
+      gameEnded = true;
+      awaitingExitConfirmation = false;
+      gameShell.hidden = true;
+      return;
+    }
+
+    if (answer === "n") {
+      event.preventDefault();
+      awaitingExitConfirmation = false;
+      statusText.textContent = "ALL CLEAR";
+      draw();
+    }
+
+    return;
+  }
+
   const moves = {
     ArrowUp: [0, -1],
     ArrowDown: [0, 1],
@@ -448,6 +488,9 @@ window.addEventListener("keydown", (event) => {
 });
 
 giveUpButton.addEventListener("click", () => {
+  if (awaitingExitConfirmation || gameEnded) {
+    return;
+  }
 
   if (gameOver) {
     attempts = 12;
@@ -473,12 +516,21 @@ giveUpButton.addEventListener("click", () => {
 });
 
 prevStageButton.addEventListener("click", () => {
+  if (awaitingExitConfirmation || gameEnded) {
+    return;
+  }
+
   loadStage(currentStageIndex - 1);
 });
 
 nextStageButton.addEventListener("click", () => {
+  if (awaitingExitConfirmation || gameEnded) {
+    return;
+  }
+
   loadStage(currentStageIndex + 1);
 });
+
 
 updateStatus();
 draw();
