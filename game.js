@@ -2,6 +2,25 @@ const GRID_SIZE = 20;
 const TILE_SIZE = 32;
 const canvas = document.getElementById("game");
 const context = canvas.getContext("2d");
+const sceneLayer = document.createElement("canvas");
+sceneLayer.width = canvas.width;
+sceneLayer.height = canvas.height;
+const sceneContext = sceneLayer.getContext("2d");
+const backgroundImage = new Image();
+const stageBackgrounds = [
+  "image/stage1 傘を差す女の子1.jpg",
+  "image/stage2 玉ねぎで泣いてる.jpg",
+  "image/stage3写生少女.png",
+  "image/stage4 school mizugi.png",
+  "image/stage5女子高生顔をあからめ会話.jpg",
+  "image/stage6 girls band.jpg",
+  "image/stage7 school girl missile.jpg",
+  "image/stage8 girls so close.jpg",
+  "image/stage9 girl and cat.jpg",
+  "image/stage10 school girl can spell.jpg"
+];
+backgroundImage.src = stageBackgrounds[0];
+backgroundImage.addEventListener("load", draw);
 const statusText = document.getElementById("status");
 const attemptsText = document.getElementById("attempts");
 const giveUpButton = document.getElementById("give-up");
@@ -40,6 +59,7 @@ let cleared = false;
 let gameOver = false;
 let awaitingExitConfirmation = false;
 let gameEnded = false;
+let autoAdvanceTimer = null;
 const clearedStages = new Set();
 
 let currentStageIndex = 0;
@@ -77,13 +97,36 @@ function parseStage(mapText) {
 }
 
 function loadStage(stageIndex) {
+  if (autoAdvanceTimer !== null) {
+    window.clearTimeout(autoAdvanceTimer);
+    autoAdvanceTimer = null;
+  }
+
   currentStageIndex = Math.max(0, Math.min(stageIndex, STAGES.length - 1));
+  setStageBackground(currentStageIndex);
   stage = parseStage(STAGES[currentStageIndex].map);
   player = findPlayer(stage);
   mergeTouchingBlocks();
   collectDotsUnderBlocks();
   updateStatus();
   draw();
+}
+
+function setStageBackground(stageIndex) {
+  const nextSource = stageBackgrounds[stageIndex];
+
+  if (nextSource && !backgroundImage.src.endsWith(encodeURI(nextSource))) {
+    backgroundImage.src = nextSource;
+  }
+}
+
+function updateStageButtons() {
+  prevStageButton.disabled = currentStageIndex === 0;
+  // A face is unlocked only after the puzzle currently shown on it is cleared.
+  nextStageButton.disabled =
+    currentStageIndex === STAGES.length - 1 ||
+    !clearedStages.has(currentStageIndex) ||
+    autoAdvanceTimer !== null;
 }
 
 function findPlayer(stageMap) {
@@ -274,37 +317,55 @@ function movePlayer(dx, dy) {
   draw();
 }
 
-function drawTile(x, y, tile) {
+function drawTile(target, x, y, tile) {
   const pixelX = x * TILE_SIZE;
   const pixelY = y * TILE_SIZE;
 
-  context.fillStyle = colors.floor;
-  context.fillRect(pixelX, pixelY, TILE_SIZE, TILE_SIZE);
-
-  context.strokeStyle = colors.grid;
-  context.strokeRect(pixelX + 0.5, pixelY + 0.5, TILE_SIZE, TILE_SIZE);
+  target.strokeStyle = "rgba(196, 230, 239, 0.55)";
+  target.strokeRect(pixelX + 0.5, pixelY + 0.5, TILE_SIZE, TILE_SIZE);
 
   if (tile === tiles.wall) {
-    context.fillStyle = colors.wall;
-    context.fillRect(pixelX, pixelY, TILE_SIZE, TILE_SIZE);
-    context.fillStyle = colors.wallTop;
-    context.fillRect(pixelX + 4, pixelY + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+    target.fillStyle = colors.wall;
+    target.fillRect(pixelX, pixelY, TILE_SIZE, TILE_SIZE);
+    target.fillStyle = colors.wallTop;
+    target.fillRect(pixelX + 4, pixelY + 4, TILE_SIZE - 8, TILE_SIZE - 8);
   }
 }
 
-function drawDot(x, y) {
+function drawBackground(target) {
+  target.fillStyle = colors.floor;
+  target.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (!backgroundImage.complete || backgroundImage.naturalWidth === 0) {
+    return;
+  }
+
+  // Keep the complete artwork visible, adding the floor color as letterboxing
+  // when its proportions differ from the square game board.
+  const scale = Math.min(
+    canvas.width / backgroundImage.naturalWidth,
+    canvas.height / backgroundImage.naturalHeight
+  );
+  const width = backgroundImage.naturalWidth * scale;
+  const height = backgroundImage.naturalHeight * scale;
+  const x = (canvas.width - width) / 2;
+  const y = (canvas.height - height) / 2;
+  target.drawImage(backgroundImage, x, y, width, height);
+}
+
+function drawDot(target, x, y) {
   const centerX = x * TILE_SIZE + TILE_SIZE / 2;
   const centerY = y * TILE_SIZE + TILE_SIZE / 2;
 
-  context.fillStyle = colors.dotRing;
-  context.beginPath();
-  context.arc(centerX, centerY, TILE_SIZE * 0.19, 0, Math.PI * 2);
-  context.fill();
+  target.fillStyle = colors.dotRing;
+  target.beginPath();
+  target.arc(centerX, centerY, TILE_SIZE * 0.19, 0, Math.PI * 2);
+  target.fill();
 
-  context.fillStyle = colors.dot;
-  context.beginPath();
-  context.arc(centerX, centerY, TILE_SIZE * 0.13, 0, Math.PI * 2);
-  context.fill();
+  target.fillStyle = colors.dot;
+  target.beginPath();
+  target.arc(centerX, centerY, TILE_SIZE * 0.13, 0, Math.PI * 2);
+  target.fill();
 }
 
 function drawIceBlock(block) {
@@ -312,61 +373,86 @@ function drawIceBlock(block) {
     const pixelX = cell.x * TILE_SIZE;
     const pixelY = cell.y * TILE_SIZE;
 
-    context.fillStyle = colors.iceShadow;
-    context.fillRect(pixelX + 3, pixelY + 3, TILE_SIZE - 5, TILE_SIZE - 5);
-    context.fillStyle = colors.ice;
+    // The already-painted scene is sampled through the ice.  A shifted sample
+    // gives the image a simple, inexpensive refraction effect.
+    context.save();
+    context.beginPath();
+    context.rect(pixelX + 2, pixelY + 2, TILE_SIZE - 6, TILE_SIZE - 6);
+    context.clip();
+    context.globalAlpha = 0.78;
+    context.drawImage(sceneLayer, pixelX - 3, pixelY - 2, TILE_SIZE, TILE_SIZE, pixelX, pixelY, TILE_SIZE, TILE_SIZE);
+    // A faint, vertically mirrored sample reads as a reflection on the surface.
+    context.globalAlpha = 0.15;
+    context.translate(0, 2 * pixelY + TILE_SIZE);
+    context.scale(1, -1);
+    context.drawImage(sceneLayer, pixelX + 2, pixelY + 3, TILE_SIZE, TILE_SIZE, pixelX, pixelY, TILE_SIZE, TILE_SIZE);
+    context.restore();
+
+    context.fillStyle = "rgba(103, 218, 249, 0.30)";
     context.fillRect(pixelX + 2, pixelY + 2, TILE_SIZE - 6, TILE_SIZE - 6);
-    context.fillStyle = colors.iceLight;
-    context.fillRect(pixelX + 6, pixelY + 6, TILE_SIZE - 18, 4);
+    const sheen = context.createLinearGradient(pixelX, pixelY, pixelX + TILE_SIZE, pixelY + TILE_SIZE);
+    sheen.addColorStop(0, "rgba(255, 255, 255, 0.72)");
+    sheen.addColorStop(0.35, "rgba(222, 252, 255, 0.16)");
+    sheen.addColorStop(1, "rgba(36, 147, 181, 0.30)");
+    context.fillStyle = sheen;
+    context.fillRect(pixelX + 2, pixelY + 2, TILE_SIZE - 6, TILE_SIZE - 6);
+    context.strokeStyle = "rgba(239, 252, 255, 0.82)";
+    context.strokeRect(pixelX + 2.5, pixelY + 2.5, TILE_SIZE - 7, TILE_SIZE - 7);
+    context.fillStyle = "rgba(255, 255, 255, 0.80)";
+    context.fillRect(pixelX + 6, pixelY + 6, TILE_SIZE - 18, 3);
   });
 }
 
-function drawFixedCube(key) {
+function drawFixedCube(target, key) {
   const parts = key.split(",");
   const pixelX = Number(parts[0]) * TILE_SIZE;
   const pixelY = Number(parts[1]) * TILE_SIZE;
 
-  context.fillStyle = "#738c94";
-  context.fillRect(pixelX + 3, pixelY + 3, TILE_SIZE - 5, TILE_SIZE - 5);
-  context.fillStyle = "#b8d4dc";
-  context.fillRect(pixelX + 2, pixelY + 2, TILE_SIZE - 6, TILE_SIZE - 6);
-  context.fillStyle = "#effcff";
-  context.fillRect(pixelX + 6, pixelY + 6, TILE_SIZE - 18, 4);
+  target.fillStyle = "#738c94";
+  target.fillRect(pixelX + 3, pixelY + 3, TILE_SIZE - 5, TILE_SIZE - 5);
+  target.fillStyle = "#b8d4dc";
+  target.fillRect(pixelX + 2, pixelY + 2, TILE_SIZE - 6, TILE_SIZE - 6);
+  target.fillStyle = "#effcff";
+  target.fillRect(pixelX + 6, pixelY + 6, TILE_SIZE - 18, 4);
 }
 
-function drawPlayer() {
+function drawPlayer(target = context) {
   const centerX = player.x * TILE_SIZE + TILE_SIZE / 2;
   const centerY = player.y * TILE_SIZE + TILE_SIZE / 2;
   const radius = TILE_SIZE * 0.34;
 
-  context.fillStyle = colors.player;
-  context.beginPath();
-  context.arc(centerX, centerY, radius, 0, Math.PI * 2);
-  context.fill();
+  target.fillStyle = colors.player;
+  target.beginPath();
+  target.arc(centerX, centerY, radius, 0, Math.PI * 2);
+  target.fill();
 
-  context.fillStyle = colors.playerLight;
-  context.beginPath();
-  context.arc(centerX - 4, centerY - 5, radius * 0.35, 0, Math.PI * 2);
-  context.fill();
+  target.fillStyle = colors.playerLight;
+  target.beginPath();
+  target.arc(centerX - 4, centerY - 5, radius * 0.35, 0, Math.PI * 2);
+  target.fill();
 }
 
 function draw() {
-  context.clearRect(0, 0, canvas.width, canvas.height);
+  sceneContext.clearRect(0, 0, canvas.width, canvas.height);
+  drawBackground(sceneContext);
 
   for (let y = 0; y < GRID_SIZE; y += 1) {
     for (let x = 0; x < GRID_SIZE; x += 1) {
-      drawTile(x, y, stage[y][x]);
+      drawTile(sceneContext, x, y, stage[y][x]);
     }
   }
 
   dots.forEach((key) => {
     const parts = key.split(",");
-    drawDot(Number(parts[0]), Number(parts[1]));
+    drawDot(sceneContext, Number(parts[0]), Number(parts[1]));
   });
 
-  fixedCubes.forEach(drawFixedCube);
+  // These objects are part of the scene sampled through movable ice.
+  fixedCubes.forEach((key) => drawFixedCube(sceneContext, key));
+  drawPlayer(sceneContext);
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(sceneLayer, 0, 0);
   blocks.forEach(drawIceBlock);
-  drawPlayer();
 
   if (cleared) {
     drawClearMessage();
@@ -429,12 +515,25 @@ function updateStatus() {
     `Stage ${currentStageIndex + 1}/${STAGES.length}: ${STAGES[currentStageIndex].name}`;
 
   if (dots.size === 0) {
+    const becameCleared = !cleared;
     cleared = true;
     clearedStages.add(currentStageIndex);
     awaitingExitConfirmation = clearedStages.size === STAGES.length;
+    const willAdvance = !awaitingExitConfirmation && currentStageIndex < STAGES.length - 1;
     statusText.textContent = awaitingExitConfirmation
       ? "ALL CLEAR - ゲームを終了しますか (y/n)"
-      : `${stageLabel} - Clear`;
+      : willAdvance
+        ? `${stageLabel} - Clear! 次の面へ進みます`
+        : `${stageLabel} - Clear`;
+
+    if (becameCleared && willAdvance) {
+      autoAdvanceTimer = window.setTimeout(() => {
+        autoAdvanceTimer = null;
+        if (cleared && !gameOver && !gameEnded) {
+          loadStage(currentStageIndex + 1);
+        }
+      }, 1000);
+    }
   } else if (gameOver) {
     statusText.textContent = "GAME OVER";
   } else {
@@ -443,6 +542,7 @@ function updateStatus() {
   }
 
   attemptsText.textContent = `残機: ${attempts}`;
+  updateStageButtons();
 }
 
 window.addEventListener("keydown", (event) => {
@@ -526,6 +626,10 @@ prevStageButton.addEventListener("click", () => {
 
 nextStageButton.addEventListener("click", () => {
   if (awaitingExitConfirmation || gameEnded) {
+    return;
+  }
+
+  if (!clearedStages.has(currentStageIndex)) {
     return;
   }
 

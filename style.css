@@ -65,6 +65,11 @@ button:active {
   transform: translateY(1px);
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .controls {
   display: flex;
   flex-wrap: wrap;
