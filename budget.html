@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>家計の見通し</title>
+    <link rel="stylesheet" href="budget.css">
+  </head>
+  <body>
+    <main class="budget-app">
+      <header class="page-header">
+        <div><p class="eyebrow">家計の見通し</p><h1>次の年金日まで、あといくら使える？</h1><p class="muted">予測開始：2026年9月27日（支払い後）</p></div>
+        <label class="balance-input">現在の使える残高 <span>円</span><input id="balance" type="number" min="0" step="1" value="0"></label>
+      </header>
+      <section class="summary-grid" aria-live="polite">
+        <article class="summary-card accent"><span id="next-pension-label">次の年金日までの見込み</span><strong id="forecast-net">—</strong><small id="forecast-period">—</small></article>
+        <article class="summary-card"><span>次の年金日までに使える目安</span><strong id="daily-limit">—</strong><small>酒代を含む・予定支出を差し引いた1日あたり</small></article>
+        <article class="summary-card"><span>2か月の収入 − 支出</span><strong id="two-month-net">—</strong><small id="two-month-period">—</small></article>
+      </section>
+      <section class="panel flow-panel"><div class="section-heading"><div><h2>これからの入出金</h2><p class="muted">予定と実績を日付順に表示します</p></div><button id="add-flow-toggle" type="button" class="secondary">＋ 入出金を追加</button></div>
+        <form id="flow-form" class="entry-form hidden"><label>内容<input name="label" required placeholder="例：臨時収入、薬代"></label><label>日付<input name="date" type="date" required></label><label>種類<select name="type"><option value="income">収入</option><option value="expense">支出</option></select></label><label>金額<input name="amount" type="number" min="1" required></label><button type="submit">追加</button></form>
+        <div id="flow-list" class="flow-list"></div>
+      </section>
+      <section class="panel receipt-panel"><div class="section-heading"><div><h2>毎日の支出を記録</h2><p class="muted">画像を添付するか、金額を手入力できます。酒代とその他の合計が総額と一致するように入力してください。</p></div></div>
+        <form id="receipt-form" class="receipt-form"><label class="image-picker">レシート画像（任意）<input name="image" type="file" accept="image/*" capture="environment"><span id="image-name">写真を選ぶ／撮る</span></label><label>日付<input name="date" type="date" required></label><label>総額<input name="total" type="number" min="0" step="1" required placeholder="0"></label><label>酒代<input name="alcohol" type="number" min="0" step="1" value="0" required></label><label>その他<input name="other" type="number" min="0" step="1" value="0" required></label><label>支払い方法<select name="method"><option value="cash">現金・口座</option><option value="card">クレジットカード</option></select></label><label class="wide">メモ（任意）<input name="memo" maxlength="80" placeholder="店名など"></label><button type="submit" class="submit-receipt">支出を記録</button></form><p id="receipt-error" class="error" role="alert"></p>
+        <div class="receipt-totals"><span>今月の酒代 <strong id="month-alcohol">—</strong></span><span>今月のその他 <strong id="month-other">—</strong></span><span>今月の合計 <strong id="month-total">—</strong></span></div><div id="receipt-list" class="receipt-list"></div>
+      </section>
+      <p class="footnote">この予測は登録内容に基づく概算です。年金・カード請求・借入返済額は実際の入金通知や明細に合わせて調整してください。データはこの端末のブラウザー内に保存されます。</p>
+    </main>
+    <script src="budget.js"></script>
+  </body>
+</html>
+
